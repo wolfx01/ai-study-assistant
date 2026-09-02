@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Study Assistant</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-gray-100 h-screen flex flex-col items-center p-4">
+
+  <!-- Container -->
+  <div class="w-full max-w-2xl bg-gray-800 rounded-xl shadow-xl flex flex-col h-full border border-gray-700 overflow-hidden">
+    
+    <!-- Header -->
+    <header class="p-4 bg-gray-850 border-b border-gray-700 flex justify-between items-center">
+      <h1 class="text-lg font-bold text-indigo-400">AI Study Assistant</h1>
+      <div class="flex items-center gap-2">
+        <input type="file" id="file-input" class="hidden" accept=".txt,.md" />
+        <button onclick="document.getElementById('file-input').click()" 
+                class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-1.5 rounded-lg transition">
+          Upload Material (.txt)
+        </button>
+      </div>
+    </header>
+
+    <!-- Upload Status Alert -->
+    <div id="upload-status" class="hidden text-xs p-2 text-center bg-gray-700 text-gray-300"></div>
+
+    <!-- Messages Container -->
+    <div id="chat-box" class="flex-1 p-4 overflow-y-auto space-y-4">
+      <div class="flex gap-2.5">
+        <div class="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-xs font-bold shrink-0">AI</div>
+        <div class="bg-gray-700 p-3 rounded-2xl rounded-tl-none max-w-[80%] text-sm">
+          Hello! Upload your study notes or ask me any questions. I can calculate, tell the time, and search your docs.
+        </div>
+      </div>
+    </div>
+
+    <!-- Input Box -->
+    <form id="chat-form" class="p-4 bg-gray-850 border-t border-gray-700 flex gap-2">
+      <input 
+        type="text" 
+        id="user-input" 
+        placeholder="Ask a question or calculate something..." 
+        class="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-indigo-500 text-white placeholder-gray-500"
+        autocomplete="off"
+        required
+      />
+      <button 
+        type="submit" 
+        id="send-btn"
+        class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-4 py-2 rounded-lg text-sm transition disabled:opacity-50">
+        Send
+      </button>
+    </form>
+  </div>
+
+  <script>
+   const API_BASE = "http://localhost:8000";
+const chatBox = document.getElementById("chat-box");
+const chatForm = document.getElementById("chat-form");
+const userInput = document.getElementById("user-input");
+const fileInput = document.getElementById("file-input");
+const uploadStatus = document.getElementById("upload-status");
+const sendBtn = document.getElementById("send-btn");
+
+// 1. مصفوفة لتخزين سجل المحادثة
+let chatHistory = JSON.parse(localStorage.getItem("study_chat_history") || "[]");
+
+function appendMessage(sender, text, save = true) {
+  const isUser = sender === "User";
+  const msgDiv = document.createElement("div");
+  msgDiv.className = `flex gap-2.5 ${isUser ? "justify-end" : ""}`;
+  
+  const avatar = isUser ? "" : `<div class="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-xs font-bold shrink-0">AI</div>`;
+  const bubbleClass = isUser 
+    ? "bg-indigo-600 text-white rounded-br-none" 
+    : "bg-gray-700 text-gray-100 rounded-tl-none whitespace-pre-wrap";
+
+  msgDiv.innerHTML = `
+    ${!isUser ? avatar : ""}
+    <div class="${bubbleClass} p-3 rounded-2xl max-w-[80%] text-sm">
+      ${text}
+    </div>
+  `;
+  chatBox.appendChild(msgDiv);
+  chatBox.scrollTop = chatBox.scrollHeight;
+
+  // حفظ الرسالة في الذاكرة المحلية
+  if (save) {
+    chatHistory.push({ sender, text });
+    localStorage.setItem("study_chat_history", JSON.stringify(chatHistory));
+  }
+}
+
+// 2. تحميل الرسائل السابقة فور فتح الصفحة أو الـ Refresh
+function loadHistory() {
+  chatHistory.forEach(item => {
+    appendMessage(item.sender, item.text, false);
+  });
+}
+loadHistory();
+
+// 3. إرسال السؤال للـ Backend
+chatForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const message = userInput.value.trim();
+  if (!message) return;
+
+  appendMessage("User", message);
+  userInput.value = "";
+  sendBtn.disabled = true;
+
+  try {
+    const res = await fetch(`${API_BASE}/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query: message })
+    });
+    
+    if (!res.ok) throw new Error("API Error");
+    const data = await res.json();
+    appendMessage("AI", data.response);
+  } catch (err) {
+    appendMessage("AI", "❌ Error connecting to backend server.");
+  } finally {
+    sendBtn.disabled = false;
+  }
+});
+
+// 4. رفع الملفات
+fileInput.addEventListener("change", async () => {
+  const file = fileInput.files[0];
+  if (!file) return;
+
+  const formData = new FormData();
+  formData.append("file", file);
+
+  uploadStatus.classList.remove("hidden");
+  uploadStatus.textContent = `Uploading "${file.name}"...`;
+
+  try {
+    const res = await fetch(`${API_BASE}/upload`, {
+      method: "POST",
+      body: formData
+    });
+    const data = await res.json();
+    uploadStatus.textContent = `✅ "${file.name}" uploaded & embedded (${data.chunks_stored} chunks stored).`;
+  } catch (err) {
+    uploadStatus.textContent = "❌ Upload failed. Make sure backend is running.";
+  }
+});
+  </script>
+</body>
+</html>

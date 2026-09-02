@@ -1,0 +1,7 @@
+.env
+api_chat/.env
+venv/
+api_chat/venv/
+__pycache__/
+api_chat/__pycache__/
+*.pyc
