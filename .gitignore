@@ -5,3 +5,10 @@ api_chat/venv/
 __pycache__/
 api_chat/__pycache__/
 *.pyc
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+.env*
+!.env.example
+.pnpm-store/

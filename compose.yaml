@@ -1,0 +1,21 @@
+name: chatbottest
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: chatbottest-postgres
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5434:5432"
+    environment:
+      POSTGRES_DB: chatdb
+      POSTGRES_USER: study
+      POSTGRES_PASSWORD: ${CHATBOT_DB_PASSWORD:?Set CHATBOT_DB_PASSWORD in .env.local}
+    volumes:
+      - study-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U study -d chatdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+volumes:
+  study-data:
